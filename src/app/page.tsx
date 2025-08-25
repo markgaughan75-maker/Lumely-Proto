@@ -79,4 +79,95 @@ export default function Home() {
         </label>
 
         <label>
-          Photo: <input name="image" type="file" accept="ima
+          Photo: <input name="image" type="file" accept="image/*" required />
+        </label>
+
+        <label>
+          Mask (optional):{" "}
+          <input name="mask" type="file" accept="image/png,image/*" />
+        </label>
+
+        <label>
+          Extra Instructions:{" "}
+          <textarea
+            name="prompt"
+            rows={3}
+            placeholder="e.g., black window frames; add landscaping; light oak floors"
+          />
+        </label>
+
+        <button
+          disabled={busy}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            cursor: busy ? "not-allowed" : "pointer",
+          }}
+        >
+          {busy ? "Processing…" : "Generate"}
+        </button>
+      </form>
+
+      {busy && (
+        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
+          Working… this can take a moment for large images.
+        </div>
+      )}
+
+      {error && (
+        <pre
+          style={{
+            marginTop: 16,
+            color: "#b00020",
+            background: "#fff5f5",
+            padding: 12,
+            borderRadius: 8,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {error}
+        </pre>
+      )}
+
+      {refined && (
+        <div
+          style={{
+            marginTop: 16,
+            background: "#fafafa",
+            padding: 12,
+            borderRadius: 8,
+          }}
+        >
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
+            Polished prompt used:
+          </div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{refined}</div>
+        </div>
+      )}
+
+      {image && (
+        <div style={{ marginTop: 16 }}>
+          <img
+            src={image}
+            alt="Result"
+            style={{
+              width: "100%",
+              borderRadius: 8,
+              boxShadow: "0 6px 24px rgba(0,0,0,.12)",
+            }}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+            Image is served from a temporary URL by the API.
+          </div>
+          <a
+            href={image}
+            download="lumely-result.png"
+            style={{ display: "inline-block", marginTop: 12 }}
+          >
+            Download result
+          </a>
+        </div>
+      )}
+    </main>
+  );
+}
