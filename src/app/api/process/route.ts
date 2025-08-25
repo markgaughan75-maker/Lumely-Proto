@@ -8,9 +8,23 @@ export const maxDuration = 60;
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 const BASE_PROMPTS: Record<string, string> = {
-  enhance: `You are an architectural retoucher. Improve realism and photo quality while preserving geometry and structure.`,
-  staging: `You are a virtual staging designer. Add tasteful, photorealistic furniture into empty rooms. Do not alter fixed architecture.`,
-  design: `You are a design transformer. Apply requested design/color/material changes faithfully while preserving structure.`
+    enhance: `Render this screenshot as if it were an ultra-realistic photograph. 
+Stay true to the original image in terms of structure, geometry, materials, and camera angle. 
+Have a bright and clear image like a high-quality photograph. 
+The image should be in the same format as attached. 
+Do not change any shapes or forms in the image — keep everything the EXACT same!`,
+
+  staging: `Render this screenshot as if it were an ultra-realistic photograph. 
+Stay true to the original image in terms of structure, geometry, materials, and camera angle. 
+Keep everything EXACT the same unless explicitly staged. 
+Add tasteful, photorealistic furniture only in the transparent mask areas. 
+Maintain bright, clear photographic quality.`,
+
+  design: `Render this screenshot as if it were an ultra-realistic photograph. 
+Stay true to the original image in terms of structure, geometry, and camera angle. 
+Keep everything EXACT the same except in the transparent mask areas, 
+where you apply the requested design or material changes. 
+Ensure the result looks like a high-quality professional photo.`
 };
 
 export async function POST(req: Request) {
