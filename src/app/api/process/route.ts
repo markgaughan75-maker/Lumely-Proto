@@ -68,7 +68,7 @@ ${userAdditions}
       maskFile = new File([maskBytes], mask.name || "mask.png", { type: mask.type || "image/png" });
     }
 
-    const edited = await client.images.edits({
+    const edited = await client.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
       image: imageFile,
       mask: maskFile,
