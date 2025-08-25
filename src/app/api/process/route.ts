@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const file = form.get("image") as File | null;
-    const mask = form.get("mask") as File | null; // optional
+    const mask = form.get("mask") as File | null;
     const userAdditions = (form.get("prompt")?.toString() ?? "").trim();
     const mode = (form.get("mode")?.toString() ?? "enhance").toLowerCase();
 
@@ -55,20 +55,24 @@ USER:
 ${userAdditions}
 `;
 
-    // 1) Refine prompt with GPT-5
+    // Step 1: Refine prompt with GPT-5
     const refined = await client.responses.create({
       model: "gpt-5",
       input: promptEngineering,
     });
     const refinedPrompt = (refined.output_text || "").trim();
 
-    // 2) Image edit with optional mask
+    // Step 2: Convert uploaded files to Buffers for Node SDK
+    const imageBuffer = Buffer.from(await file.arrayBuffer());
+    const maskBuffer = mask ? Buffer.from(await mask.arrayBuffer()) : undefined;
+
+    // Step 3: Call Images API
     const edited = await client.images.edit({
-      model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1", // gpt-image-1 supports edits+masks
-      image: file,                 // use the uploaded File directly
-      mask: mask ?? undefined,     // pass mask only if present
+      model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
+      image: imageBuffer,         // Buffer, works on Vercel
+      mask: maskBuffer,
       prompt: refinedPrompt,
-      size: "1024x1024",           // you can switch to 1792x1024/1024x1792 later if you want
+      size: "1024x1024",
     });
 
     const url = edited.data?.[0]?.url;
