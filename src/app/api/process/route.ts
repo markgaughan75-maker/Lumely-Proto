@@ -1,5 +1,6 @@
 // src/app/api/process/route.ts
 import OpenAI from "openai";
+import { toFile } from "openai/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     const userAdditions = (form.get("prompt")?.toString() ?? "").trim();
     const mode = (form.get("mode")?.toString() ?? "enhance").toLowerCase();
 
-    // Guards
+    // ---- Guards
     if (!file) {
       return new Response(JSON.stringify({ error: "No image uploaded" }), { status: 400 });
     }
@@ -76,27 +77,26 @@ ${userAdditions}
     });
     const refinedPrompt = (refined.output_text || "").trim();
 
-    // 2) Convert uploads to Blobs AND include filename/type for the SDK
-    const imageBlob = new Blob([await file.arrayBuffer()], { type: file.type || "image/png" });
-    const imageUpload = {
-      data: imageBlob,
-      name: file.name || "upload.png",
-      type: file.type || "image/png",
-    } as const;
+    // 2) Convert uploads to true Files using the SDK helper
+    //    (this avoids "missing image" / type issues in serverless)
+    const imageAb = await file.arrayBuffer();
+    const imageFile = await toFile(
+      new Blob([imageAb], { type: file.type || "image/png" }),
+      file.name || "upload.png"
+    );
 
-    const maskUpload = mask
-      ? ({
-          data: new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" }),
-          name: mask.name || "mask.png",
-          type: mask.type || "image/png",
-        } as const)
+    const maskFile = mask
+      ? await toFile(
+          new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" }),
+          mask.name || "mask.png"
+        )
       : undefined;
 
-    // 3) OpenAI Images Edit (returns a temporary URL)
+    // 3) Edit image (mask optional) – returns a temporary URL
     const edited = await client.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
-      image: imageUpload,           // <-- include name + type
-      mask: maskUpload,             // optional
+      image: imageFile,
+      mask: maskFile,
       prompt: refinedPrompt,
       size: "1024x1024",
     });
