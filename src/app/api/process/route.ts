@@ -74,7 +74,6 @@ ${userAdditions}
       mask: maskFile,
       prompt: refinedPrompt,
       size: "1024x1024",
-      response_format: "b64_json",
     });
 
     const b64 = edited.data?.[0]?.b64_json;
