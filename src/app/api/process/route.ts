@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // ~4 MB guard for serverless uploads
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // ~4 MB
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const userAdditions = (form.get("prompt")?.toString() ?? "").trim();
     const mode = (form.get("mode")?.toString() ?? "enhance").toLowerCase();
 
-    // ---- Server-side guards (clear errors before calling OpenAI)
+    // Guards
     if (!file) {
       return new Response(JSON.stringify({ error: "No image uploaded" }), { status: 400 });
     }
@@ -69,24 +69,34 @@ USER:
 ${userAdditions}
 `;
 
-    // 1) Refine prompt with GPT-5 (prompt polishing)
+    // 1) Refine prompt with GPT-5
     const refined = await client.responses.create({
       model: "gpt-5",
       input: promptEngineering,
     });
     const refinedPrompt = (refined.output_text || "").trim();
 
-    // 2) Convert uploaded files to Blobs (what the SDK expects)
+    // 2) Convert uploads to Blobs AND include filename/type for the SDK
     const imageBlob = new Blob([await file.arrayBuffer()], { type: file.type || "image/png" });
-    const maskBlob = mask
-      ? new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" })
+    const imageUpload = {
+      data: imageBlob,
+      name: file.name || "upload.png",
+      type: file.type || "image/png",
+    } as const;
+
+    const maskUpload = mask
+      ? ({
+          data: new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" }),
+          name: mask.name || "mask.png",
+          type: mask.type || "image/png",
+        } as const)
       : undefined;
 
-    // 3) Edit image (mask optional). Returns a temporary URL.
+    // 3) OpenAI Images Edit (returns a temporary URL)
     const edited = await client.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
-      image: imageBlob,
-      mask: maskBlob,
+      image: imageUpload,           // <-- include name + type
+      mask: maskUpload,             // optional
       prompt: refinedPrompt,
       size: "1024x1024",
     });
