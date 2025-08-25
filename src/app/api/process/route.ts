@@ -63,14 +63,15 @@ ${userAdditions}
     const refinedPrompt = (refined.output_text || "").trim();
 
     // Step 2: Convert uploaded files to Buffers for Node SDK
-    const imageBuffer = Buffer.from(await file.arrayBuffer());
-    const maskBuffer = mask ? Buffer.from(await mask.arrayBuffer()) : undefined;
+    const imageBlob = new Blob([await file.arrayBuffer()], { type: file.type || "image/png" });
+    const maskBlob = mask ? new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" }) : undefined;
+
 
     // Step 3: Call Images API
     const edited = await client.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
-      image: imageBuffer,         // Buffer, works on Vercel
-      mask: maskBuffer,
+      image: imageBlob,      // ✅ Blob is Uploadable
+      mask: maskBlob,        // optional
       prompt: refinedPrompt,
       size: "1024x1024",
     });
