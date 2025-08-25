@@ -2,9 +2,6 @@
 "use client";
 import React, { useState } from "react";
 
-type ApiOk = { image: string; refinedPrompt?: string };
-type ApiErr = { error?: string; message?: string; stack?: string };
-
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
   const [refined, setRefined] = useState<string | null>(null);
@@ -22,32 +19,25 @@ export default function Home() {
 
     try {
       const res = await fetch("/api/process", { method: "POST", body: fd });
-
-      // Read body safely whether it's JSON or text
       const raw = await res.text();
-      let data: ApiOk & ApiErr;
+
+      // Be flexible about the response type to avoid TS errors at build time.
+      let data: any = raw;
       try {
         data = JSON.parse(raw);
       } catch {
-        data = { error: raw as any };
+        data = { error: raw };
       }
 
       if (!res.ok) {
-        // Build a helpful message from whatever we got back
-        const msg =
-          data?.error ||
-          data?.message ||
-          (raw?.trim() || `Request failed with status ${res.status}`);
+        const msg = data?.error || data?.message || raw?.trim() || `Request failed (${res.status})`;
         throw new Error(msg);
       }
 
-      setImage((data as ApiOk).image || null);
-      setRefined((data as ApiOk).refinedPrompt || null);
+      setImage(data?.image ?? null);
+      setRefined(data?.refinedPrompt ?? null);
     } catch (err: any) {
-      setError(
-        (err?.message || "Unexpected error") +
-          (err?.stack ? `\n\n${String(err.stack)}` : "")
-      );
+      setError(err?.message || "Unexpected error");
     } finally {
       setBusy(false);
     }
@@ -64,8 +54,7 @@ export default function Home() {
     >
       <h1 style={{ fontSize: 28, fontWeight: 700 }}>Lumely.ai Prototype</h1>
       <p style={{ opacity: 0.8 }}>
-        Upload a render/room photo and (optionally) a PNG mask. Transparent mask
-        areas are editable; opaque areas stay frozen.
+        Upload a render/room photo and (optionally) a PNG mask. Transparent mask areas are editable; opaque areas stay frozen.
       </p>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, marginTop: 16 }}>
@@ -83,8 +72,7 @@ export default function Home() {
         </label>
 
         <label>
-          Mask (optional):{" "}
-          <input name="mask" type="file" accept="image/png,image/*" />
+          Mask (optional): <input name="mask" type="file" accept="image/png,image/*" />
         </label>
 
         <label>
@@ -98,11 +86,7 @@ export default function Home() {
 
         <button
           disabled={busy}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            cursor: busy ? "not-allowed" : "pointer",
-          }}
+          style={{ padding: "10px 14px", borderRadius: 8, cursor: busy ? "not-allowed" : "pointer" }}
         >
           {busy ? "Processing…" : "Generate"}
         </button>
@@ -130,17 +114,8 @@ export default function Home() {
       )}
 
       {refined && (
-        <div
-          style={{
-            marginTop: 16,
-            background: "#fafafa",
-            padding: 12,
-            borderRadius: 8,
-          }}
-        >
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
-            Polished prompt used:
-          </div>
+        <div style={{ marginTop: 16, background: "#fafafa", padding: 12, borderRadius: 8 }}>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Polished prompt used:</div>
           <div style={{ whiteSpace: "pre-wrap" }}>{refined}</div>
         </div>
       )}
@@ -150,20 +125,12 @@ export default function Home() {
           <img
             src={image}
             alt="Result"
-            style={{
-              width: "100%",
-              borderRadius: 8,
-              boxShadow: "0 6px 24px rgba(0,0,0,.12)",
-            }}
+            style={{ width: "100%", borderRadius: 8, boxShadow: "0 6px 24px rgba(0,0,0,.12)" }}
           />
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
             Image is served from a temporary URL by the API.
           </div>
-          <a
-            href={image}
-            download="lumely-result.png"
-            style={{ display: "inline-block", marginTop: 12 }}
-          >
+          <a href={image} download="lumely-result.png" style={{ display: "inline-block", marginTop: 12 }}>
             Download result
           </a>
         </div>
