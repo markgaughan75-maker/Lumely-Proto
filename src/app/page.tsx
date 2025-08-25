@@ -2,7 +2,54 @@
 "use client";
 import React, { useState } from "react";
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // ~4MB (Vercel body limit)
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // ~4MB
+
+async function resizeImageFile(
+  file: File,
+  maxSide = 1600,
+  mime = "image/jpeg",
+  quality = 0.9
+): Promise<File> {
+  // Read file -> HTMLImageElement
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = dataUrl;
+  });
+
+  // Compute new size (keep aspect ratio)
+  let { width, height } = img;
+  if (Math.max(width, height) > maxSide) {
+    if (width >= height) {
+      height = Math.round((height / width) * maxSide);
+      width = maxSide;
+    } else {
+      width = Math.round((width / height) * maxSide);
+      height = maxSide;
+    }
+  }
+
+  // Draw to canvas
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, width, height);
+
+  // Canvas -> Blob -> File
+  const blob: Blob = await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b as Blob), mime, quality)
+  );
+  return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: mime });
+}
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
@@ -12,24 +59,47 @@ export default function Home() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true); setError(null); setImage(null); setRefined(null);
+    setBusy(true);
+    setError(null);
+    setImage(null);
+    setRefined(null);
 
-    const fd = new FormData(e.currentTarget);
-
-    // client-side size check
-    const file = fd.get("image") as File | null;
-    if (!file) { setBusy(false); setError("Please choose an image."); return; }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setBusy(false);
-      setError(`Your file is ${(file.size/1024/1024).toFixed(2)} MB. The current limit is ~4 MB on this prototype. Please upload a smaller image (or resize to ~1024–1792px).`);
-      return;
-    }
-
+    const originalFd = new FormData(e.currentTarget);
     try {
+      // Pull the original file, resize, and replace it in a new FormData
+      const originalFile = originalFd.get("image") as File | null;
+      if (!originalFile) throw new Error("Please choose an image file.");
+
+      // Resize on client to keep under serverless limits
+      const resized = await resizeImageFile(originalFile, 1600, "image/jpeg", 0.9);
+
+      if (resized.size > MAX_UPLOAD_BYTES) {
+        throw new Error(
+          `After resize it's ${(resized.size / 1024 / 1024).toFixed(
+            2
+          )} MB (limit ~4 MB). Try a smaller image or lower quality.`
+        );
+      }
+
+      const fd = new FormData();
+      for (const [k, v] of originalFd.entries()) {
+        if (k === "image") continue; // replace with resized
+        fd.append(k, v);
+      }
+      fd.append("image", resized, resized.name);
+
       const res = await fetch("/api/process", { method: "POST", body: fd });
       const raw = await res.text();
-      let data: any; try { data = JSON.parse(raw); } catch { data = { error: raw }; }
-      if (!res.ok) throw new Error(data?.error || data?.message || raw?.trim() || `Request failed (${res.status})`);
+      let data: any;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { error: raw };
+      }
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || raw?.trim() || `Request failed (${res.status})`);
+      }
+
       setImage(data?.image ?? null);
       setRefined(data?.refinedPrompt ?? null);
     } catch (err: any) {
@@ -67,12 +137,14 @@ export default function Home() {
 
       {busy && <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>Working…</div>}
       {error && <pre style={{ marginTop: 16, color: "#b00020", background: "#fff5f5", padding: 12, borderRadius: 8, whiteSpace: "pre-wrap" }}>{error}</pre>}
+
       {refined && (
         <div style={{ marginTop: 16, background: "#fafafa", padding: 12, borderRadius: 8 }}>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Polished prompt used:</div>
           <div style={{ whiteSpace: "pre-wrap" }}>{refined}</div>
         </div>
       )}
+
       {image && (
         <div style={{ marginTop: 16 }}>
           <img src={image} alt="Result" style={{ width: "100%", borderRadius: 8, boxShadow: "0 6px 24px rgba(0,0,0,.12)" }} />
