@@ -55,23 +55,24 @@ USER:
 ${userAdditions}
 `;
 
-    // Step 1: Refine prompt with GPT-5
+    // 1) Refine prompt with GPT-5
     const refined = await client.responses.create({
       model: "gpt-5",
       input: promptEngineering,
     });
     const refinedPrompt = (refined.output_text || "").trim();
 
-    // Step 2: Convert uploaded files to Buffers for Node SDK
+    // 2) Convert uploaded files to Blobs (what the SDK expects as Uploadable)
     const imageBlob = new Blob([await file.arrayBuffer()], { type: file.type || "image/png" });
-    const maskBlob = mask ? new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" }) : undefined;
+    const maskBlob = mask
+      ? new Blob([await mask.arrayBuffer()], { type: mask.type || "image/png" })
+      : undefined;
 
-
-    // Step 3: Call Images API
+    // 3) Edit image (mask optional)
     const edited = await client.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
-      image: imageBlob,      // ✅ Blob is Uploadable
-      mask: maskBlob,        // optional
+      image: imageBlob,
+      mask: maskBlob,
       prompt: refinedPrompt,
       size: "1024x1024",
     });
